@@ -13,6 +13,12 @@ Run Installer File
 
 ./install
 
+# Run
+
+just Type Server_Up command
+
+~ Server_Up
+
 
 # Remove
 
