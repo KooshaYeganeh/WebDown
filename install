@@ -1,0 +1,20 @@
+#!/usr/bin/bash
+
+
+
+wget https://github.com/kooshakoosha/WebDown/archive/refs/heads/main.zip
+
+main_file=$(find . -type f -iname "main.zip")
+
+if [ "$main_file" ];then
+
+	unzip main.zip
+
+	cd WebDown-main/
+
+	sudo cp Server_Up /usr/bin
+else
+	echo " Try Again to Download File"
+fi
+
+
