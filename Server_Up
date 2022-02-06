@@ -1,0 +1,258 @@
+#!/usr/bin/bash
+
+
+username=$(whoami)
+
+# Find OS
+
+red=`tput setaf 1`
+green=`tput setaf 6`
+yellow=`tput setaf 3`
+
+Fedora=$(cat /etc/os-release | grep Fedora)
+ubuntu=$(cat /etc/os-release | grep Ubuntu)
+alpine=$(cat /etc/os-release | grep Alpine)
+rocky=$(cat /etc/os-release | grep Rocky)
+alma=$(cat /etc/os-release | grep AlmaLinux)
+debian=$(cat /etc/os-release | grep Debain)
+
+
+listen=$(netstat -na | grep LISTEN | grep 80)
+
+webserver(){
+
+	if [ "$Fedora" ] || [ "$rocky" ] || [ "$alma" ];then
+		redhat_base_apache=$(sudo systemctl | grep httpd)
+		redhat_base_nginx=$(sudo systemctl | grep nginx)
+		if [ "$redhat_base_apache" ];then
+			true
+		else
+			echo "$red Apache WebServer is Down [ERROR]"
+			echo "$green Starting webserver"
+			httpd_exist=$(ls -l /usr/lib/systemd/system | grep httpd)			
+			if [ "$httpd_exist" ];then
+				sudo systemctl start httpd
+			else
+				true
+			fi
+		fi
+
+		if [ "$redhat_base_nginx" ];then
+			true
+		else
+			echo "$red Nginx WebServer is Down [ERROR]"
+			echo "$green Starting Web server"
+			nginx_exist=$(ls -l /usr/lib/systemd/system | grep nginx)
+			if [ "$nginx_exist" ];then
+				sudo systemctl start nginx
+			else
+				true
+			fi
+		fi
+			
+	elif [ "$ubuntu" ] || [ "$alpine" ] || ["$debian"];then
+		debian_base_apache=$(sudo systemctl | grep apache2)
+		debian_base_nginx=$(sudo systemctl | grep nginx)
+		if [ "$debain_base_apache" ];then
+			true
+		else
+			echo "$red Apache WebServer is Down [ERROR]"
+			echo "$green Starting WebServer"
+			apache_exist=$(ls -l /usr/lib/systemd/system | grep apache2)
+			if [ "$apache_exist" ];then
+				sudo systemctl start apache2
+			else
+				true
+			fi
+		fi
+		if [ "$debian_base_nginx" ];then
+			true
+		else
+			echo "$red Nginx WebServer is Down [ERROR]"
+			echo "$green Starting WebServer"
+			nginx_deb=$(ls -l /usr/lib/systemd/system | grep nginx)
+			if [ "$nginx_deb" ];then
+				sudo systemctl start Nginx
+			else
+				true
+			fi
+		fi
+
+	else 
+		echo "Can Not Detect OS..."
+	fi
+
+
+}
+
+check_ports(){
+
+	interface=$(ifconfig | awk {'print $1'} | grep "enp*" | cut -d":" -f1)
+	ip_80=$(sudo iptables -nvL --line-numbers | grep ACCEPT | grep 80)
+	ip_80_not=$(sudo iptables -nvL --line-numbers | grep DROP | grep ! | grep 80)
+	if [ "$ip_80" ] || [ "ip_80_not" ];then
+		true
+	else
+		echo "$red Edit Firewall Rules and Open Port 80 [ERROR]"
+		echo "$green I Try to Solve Problem and Set Rules For You..."
+		
+		sudo iptables -A INPUT -i $interface -p tcp --dport 80 -j ACCEPT
+		sudo iptables -A OUTPUT -o $interface -p tcp --sport 80 -j ACCEPT
+	
+	fi
+	ip_443=$(sudo iptables -nvL --line-numbers | grep ACCEPT | grep 443)
+	ip_443_not=$(sudo iptables -nvL --line-numbers | grep ACCEPT | grep ! | grep 443)
+	if [ "$ip_443" ] || [ "$ip_443_not" ];then
+		true
+	else
+		echo "$red Edit Firewall Rules and add Port 443 [ERROR]"
+		echo "$green I Try to Solve problem and  Set Rules For You..."
+
+		sudo iptables -A INPUT -i $interface -p tcp --dport 443 -j ACCEPT
+		sudo iptables -A OUTPUT -o $interface -p tcp --sport 443 -j ACCEPT
+	
+
+	fi
+	firewalld=$(sudo ls -l /usr/lib/systemd/system | grep firewalld)
+	status_firewalld=$(sudo systemctl | firewalld)
+	if [ "$firewalld" ];then
+		if [ "$status_firewalld" ];then
+
+			fd_80_tcp=$(sudo firewall-cmd --zone=public --list-ports | grep 80/tcp)
+			if [ "$fd_80_tcp" ];then
+				true
+			else
+				echo "$red Find Problem on Firewalld Rules"
+				echo "$green I Try to Solve problem and Set Rules For You..."
+				sudo firewall-cmd --permanent --zone=public --add-port=80/tcp
+			fi
+			fd_80_udp=$(sudo firewall-cmd --zone=public --list-ports | grep 80/udp)
+			if [ "$fd_80_udp" ];then
+				true
+			else
+				echo "$red Find Problem on Firewall Rules"
+				echo "$green I Try Solve Problem and Set Rules For You..."
+				sudo firewall-cmd --permanent --zone=public --add-port=80/udp
+			fi
+			fd_443=$(sudo firewall-cmd --zone=public --list-ports | grep 443)
+			if [ "" ];then
+				true
+			else
+				echo "$red Find Problem on Firewall Rules"
+				echo "$green I Try to Solve Problem and Set Rules For You..."
+				sudo firewall-cmd --permanent --zone=public --add-port=443/tcp
+			fi
+		else
+			echo "$red firewalld is Not active in system"
+		fi
+
+	else
+		echo "$red firewalld service in Not installed on system"
+	fi
+
+	
+}
+
+
+
+check_database(){
+
+	mariadb=$(sudo systemctl | grep mariadb)
+	if [ "$mariadb" ];then
+		true
+	else
+
+		mariadb=$(ls -l /usr/lib/systemd/system | grep mariadb)
+		if [ "$mariadb" ];then
+			echo "$red MariaDB is Down [EEROR]"
+			echo "$green I Try to Solve Problem ..."
+			sudo systemctl start mariadb
+		else
+			true
+		fi
+	fi
+	mysql=$(sudo systemctl | grep mysql)
+	if [ "$mysql" ];then
+		true
+	else
+		
+		mysql=$(ls -l /usr/lib/systemd/system | grep mysql)
+		if [ "$mysql" ];then
+			echo "$red MYSQL is Down [ERROR]"
+			echo "$green I Try to Solve Problem..."
+			sudo systemctl start mysql
+		else
+			true
+		fi
+	fi
+	postgresql=$(sudo systemctl | grep postgresql)
+	if [ "$postgresql" ];then
+		true
+	else
+		
+		postgresql=$(ls -l /usr/lib/systemd/system | grep postgresql)
+		if [ "$postgresql" ];then
+			echo "$red PostgreSQL is Down [EEROR]"
+			echo "$green I Try to Solve Problem"
+			sudo systemctl start postgresql
+		else
+			true
+		fi
+	fi
+
+}
+
+
+
+
+selinux(){
+
+	sestatus=$(sudo sestatus | grep "Current mode" | awk '{print $3}')
+	if [ "$sestatus" == "enforcing" ];then
+		true
+	else
+		echo "$red Selinux is Enable and This will be Better for Server but Problem is might be from Selinux."
+		echo "$yellow I try to Turn off selinux"
+		sudo setenforce 0
+	fi
+
+
+}
+
+
+
+
+
+menu(){
+
+	echo "$yellow ========================================="
+	echo "$yellow ========================================="
+	echo ""
+	echo "$yellow [1] Start Find problem and Debug"
+	echo "$yellow [2] Exit"
+	echo ""
+	echo "$yellow ========================================="
+	echo "$yellow ========================================="
+	read response
+	if [ "$response" == 1 ];then
+		if [ "$listen" ];then
+			true
+		else
+			webserver
+		fi
+
+		check_ports
+		check_database
+		selinux
+	elif [ "$response" == 2 ];then
+		exit 0
+	else
+		echo "$red Enter Valid Number"
+		menu
+	fi
+
+}
+
+menu
+
+
